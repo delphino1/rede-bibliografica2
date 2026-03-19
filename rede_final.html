@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rede de Co-Citação · Relações Raciais no Brasil</title>
+<meta name="description" content="Rede de co-citação bibliométrica sobre relações raciais no Brasil — 146 autores, 496 co-citações, SciELO Citation Index">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;background:#03030a;color:#e8e8f0}
+#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
+#app{position:relative;z-index:1;display:flex;width:100%;height:100%}
+
+/* ── Panel ── */
+#panel{position:relative;width:280px;min-width:280px;height:100%;background:rgba(7,7,18,0.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-right:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;z-index:10;transition:transform .35s cubic-bezier(.4,0,.2,1),min-width .35s;overflow:hidden}
+#panel.collapsed{transform:translateX(-280px);min-width:0}
+#panel-toggle{position:absolute;right:-28px;top:50%;transform:translateY(-50%);width:28px;height:56px;background:rgba(7,7,18,0.97);border:1px solid rgba(255,255,255,0.07);border-left:none;border-radius:0 10px 10px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.45);font-size:13px;transition:color .2s,background .2s;z-index:11;outline:none}
+#panel-toggle:hover{color:#fff;background:rgba(14,14,36,0.99)}
+#panel-toggle .arrow{display:inline-block;transition:transform .35s}
+#panel.collapsed #panel-toggle .arrow{transform:rotate(180deg)}
+.panel-inner{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 20px 16px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent}
+.panel-inner::-webkit-scrollbar{width:4px}
+.panel-inner::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+.eyebrow{font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:8px}
+.panel-title{font-size:19px;font-weight:700;line-height:1.25;color:#f0f0ff;margin-bottom:4px}
+.panel-title em{font-style:normal;display:block;font-size:11px;font-weight:400;color:rgba(255,255,255,0.38);margin-top:6px;font-family:'Space Mono',monospace}
+.search-wrap{position:relative;margin:18px 0 0}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.3);font-size:15px;pointer-events:none;line-height:1}
+#search-input{width:100%;padding:9px 12px 9px 34px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#e8e8f0;font-family:'Space Grotesk',sans-serif;font-size:13px;outline:none;transition:border-color .2s,background .2s}
+#search-input::placeholder{color:rgba(255,255,255,0.25)}
+#search-input:focus{border-color:rgba(255,255,255,0.25);background:rgba(255,255,255,0.08)}
+#search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:rgba(12,12,28,0.98);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;z-index:100;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.6)}
+#search-dropdown.open{display:block}
+.search-item{padding:9px 14px;font-size:12px;cursor:pointer;color:rgba(255,255,255,0.7);transition:background .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-item:hover{background:rgba(255,255,255,0.08);color:#fff}
+.search-empty{padding:9px 14px;font-size:12px;color:rgba(255,255,255,0.3);font-style:italic}
+#node-card{margin-top:16px;display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 14px 12px}
+.node-card-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.node-card-name{font-size:13px;font-weight:600;line-height:1.35;color:#f0f0ff;margin-bottom:10px}
+.node-card-stats{display:flex;gap:16px;margin-bottom:12px}
+.stat-item{display:flex;flex-direction:column;gap:2px}
+.stat-val{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:#f0f0ff}
+.stat-lbl{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.08em}
+.neighbors-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.3);margin-bottom:6px;font-family:'Space Mono',monospace}
+.neighbor-chip{display:inline-block;margin:2px 3px 2px 0;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);font-size:10px;color:rgba(255,255,255,0.6);cursor:pointer;transition:background .15s}
+.neighbor-chip:hover{background:rgba(255,255,255,0.13);color:#fff}
+.divider{height:1px;background:rgba(255,255,255,0.06);margin:18px 0}
+.legend-title{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,0.3);font-family:'Space Mono',monospace;margin-bottom:10px}
+.legend-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;cursor:pointer;margin-bottom:2px;transition:background .15s}
+.legend-item:hover{background:rgba(255,255,255,0.05)}
+.legend-item.active{background:rgba(255,255,255,0.08)}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.legend-name{font-size:11px;color:rgba(255,255,255,0.7);flex:1;line-height:1.3}
+.legend-count{font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,0.35);flex-shrink:0}
+
+/* ── Sobre / Metodologia ── */
+.sobre-block{margin-top:4px;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px}
+.sobre-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.sobre-label{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.1em}
+.sobre-value{font-size:11px;color:rgba(255,255,255,0.65);text-align:right;max-width:150px;line-height:1.4}
+.sobre-row:last-child{margin-bottom:0}
+
+.stats-footer{padding:12px 20px 14px;border-top:1px solid rgba(255,255,255,0.06);font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,0.25);flex-shrink:0;line-height:1.7}
+
+/* ── Canvas ── */
+#canvas-area{flex:1;position:relative;overflow:hidden}
+#viz-svg{width:100%;height:100%;background:radial-gradient(ellipse at 58% 48%,#08081e 0%,#03030a 68%);cursor:grab;display:block}
+#viz-svg:active{cursor:grabbing}
+
+/* ── Buttons ── */
+#fixed-buttons{position:absolute;bottom:28px;right:28px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:20}
+.fixed-btn{padding:9px 16px;background:rgba(14,14,30,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:rgba(255,255,255,0.7);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:500;cursor:pointer;backdrop-filter:blur(10px);transition:all .2s;white-space:nowrap}
+.fixed-btn:hover{background:rgba(24,24,50,0.98);color:#fff;border-color:rgba(255,255,255,0.25)}
+#btn-reset{display:none}
+
+/* ── Hint ── */
+#hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);padding:7px 18px;background:rgba(10,10,24,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:20px;font-size:11px;color:rgba(255,255,255,0.35);pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .6s;z-index:5;font-family:'Space Mono',monospace}
+#hint.visible{opacity:1}
+
+/* ── Tooltip ── */
+#tooltip{position:fixed;z-index:200;pointer-events:none;background:rgba(8,8,22,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,0.85);max-width:220px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,0.5);opacity:0;transition:opacity .15s;backdrop-filter:blur(10px)}
+#tooltip.visible{opacity:1}
+.tt-name{font-weight:600;color:#fff;margin-bottom:4px;font-size:13px}
+.tt-cluster{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em}
+.tt-degree{font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px}
+
+/* ── Splash / Load screen ── */
+#load-screen{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;background:radial-gradient(ellipse at 55% 45%,#0a0a22 0%,#03030a 70%)}
+.splash-eyebrow{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,0.22);margin-bottom:18px}
+.splash-title{font-size:clamp(26px,4vw,46px);font-weight:700;text-align:center;line-height:1.18;color:#f0f0ff;margin-bottom:10px;letter-spacing:-.01em}
+.splash-title span{background:linear-gradient(135deg,#7b6fff,#40c4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.splash-sub{font-size:13px;color:rgba(255,255,255,0.32);margin-bottom:52px;font-family:'Space Mono',monospace;letter-spacing:.05em}
+.splash-stats{display:flex;gap:40px;margin-bottom:48px}
+.splash-stat{display:flex;flex-direction:column;align-items:center;gap:4px}
+.splash-stat-num{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;color:#f0f0ff}
+.splash-stat-lbl{font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.12em}
+.splash-divider{width:1px;background:rgba(255,255,255,0.08);align-self:stretch}
+
+/* Loading bar */
+.splash-loading{display:flex;flex-direction:column;align-items:center;gap:12px}
+.splash-bar-wrap{width:240px;height:2px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden}
+.splash-bar{height:100%;width:0%;background:linear-gradient(90deg,#7b6fff,#40c4ff);border-radius:2px;transition:width .4s ease;animation:bar-pulse 2s ease-in-out infinite}
+@keyframes bar-pulse{0%,100%{opacity:.7}50%{opacity:1}}
+.splash-loading-text{font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:.1em}
+
+/* Upload fallback */
+.splash-upload{display:none;flex-direction:column;align-items:center;gap:12px;margin-top:8px}
+.drop-zone{width:320px;height:130px;border:1.5px dashed rgba(255,255,255,0.16);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:border-color .2s,background .2s;background:rgba(255,255,255,0.02)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:rgba(123,111,255,0.55);background:rgba(123,111,255,0.05)}
+.drop-icon{font-size:26px;opacity:.38;user-select:none}
+.drop-label{font-size:12px;color:rgba(255,255,255,0.4);text-align:center;line-height:1.5}
+.drop-label span{color:#7b6fff;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+#file-input{display:none}
+
+/* Loading overlay (processing) */
+#loading-overlay{position:fixed;inset:0;z-index:9500;background:#03030a;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spinner{width:36px;height:36px;border:2px solid rgba(255,255,255,0.07);border-top-color:#7b6fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<!-- Splash / Load screen -->
+<div id="load-screen">
+  <div class="splash-eyebrow">Bibliometria · Ciências Sociais · Brasil</div>
+  <div class="splash-title">Rede de <span>Co-Citação</span><br>Relações Raciais no Brasil</div>
+  <div class="splash-sub">SciELO Citation Index · 254 artigos analisados</div>
+
+  <div class="splash-stats">
+    <div class="splash-stat">
+      <div class="splash-stat-num">146</div>
+      <div class="splash-stat-lbl">Autores</div>
+    </div>
+    <div class="splash-divider"></div>
+    <div class="splash-stat">
+      <div class="splash-stat-num">496</div>
+      <div class="splash-stat-lbl">Co-citações</div>
+    </div>
+    <div class="splash-divider"></div>
+    <div class="splash-stat">
+      <div class="splash-stat-num">7</div>
+      <div class="splash-stat-lbl">Comunidades</div>
+    </div>
+  </div>
+
+  <div class="splash-loading" id="splash-loading">
+    <div class="splash-bar-wrap"><div class="splash-bar" id="splash-bar"></div></div>
+    <div class="splash-loading-text" id="splash-loading-text">Carregando rede…</div>
+  </div>
+
+  <div class="splash-upload" id="splash-upload">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">✦</div>
+      <div class="drop-label">
+        Arraste <strong>rede_raca.gexf</strong> aqui<br>
+        ou <span id="browse-link">escolha o arquivo</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" accept=".gexf,.xml">
+  </div>
+</div>
+
+<!-- Processing overlay -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Construindo rede…</div>
+</div>
+
+<!-- App -->
+<div id="app" style="display:none">
+  <div id="panel">
+    <button id="panel-toggle" title="Recolher painel">
+      <span class="arrow">&#8249;</span>
+    </button>
+    <div class="panel-inner">
+      <div class="eyebrow">Rede de Co-Citação</div>
+      <h1 class="panel-title">
+        Relações Raciais<br>no Brasil
+        <em>SciELO Citation Index · 254 artigos</em>
+      </h1>
+
+      <div class="search-wrap">
+        <span class="search-icon">&#9906;</span>
+        <input type="text" id="search-input" placeholder="Buscar autor…" autocomplete="off">
+        <div id="search-dropdown"></div>
+      </div>
+
+      <div id="node-card">
+        <div class="node-card-tag" id="card-tag"></div>
+        <div class="node-card-name" id="card-name"></div>
+        <div class="node-card-stats">
+          <div class="stat-item">
+            <div class="stat-val" id="card-degree">0</div>
+            <div class="stat-lbl">Conexões</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val" id="card-pct">0%</div>
+            <div class="stat-lbl">da rede</div>
+          </div>
+        </div>
+        <div class="neighbors-label">Principais co-citações</div>
+        <div id="card-neighbors"></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="legend-title">Comunidades Temáticas</div>
+      <div id="cluster-legend"></div>
+
+      <div class="divider"></div>
+      <div class="legend-title">Metodologia</div>
+      <div class="sobre-block">
+        <div class="sobre-row">
+          <span class="sobre-label">Corpus</span>
+          <span class="sobre-value">254 artigos · SciELO Citation Index</span>
+        </div>
+        <div class="sobre-row">
+          <span class="sobre-label">Período</span>
+          <span class="sobre-value">2000–2024</span>
+        </div>
+        <div class="sobre-row">
+          <span class="sobre-label">Filtragem</span>
+          <span class="sobre-value">Co-citações com peso ≥ 7</span>
+        </div>
+        <div class="sobre-row">
+          <span class="sobre-label">Layout</span>
+          <span class="sobre-value">ForceAtlas2 (Gephi)</span>
+        </div>
+        <div class="sobre-row">
+          <span class="sobre-label">Clusters</span>
+          <span class="sobre-value">Modularidade de Louvain</span>
+        </div>
+        <div class="sobre-row">
+          <span class="sobre-label">Stack</span>
+          <span class="sobre-value">D3.js v7 · GEXF</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-footer" id="stats-footer">
+      — autores · — conexões<br>
+      <span style="font-size:9px;opacity:.6">Arraste · Zoom · Clique para explorar</span>
+    </div>
+  </div>
+
+  <div id="canvas-area">
+    <svg id="viz-svg">
+      <defs>
+        <filter id="node-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <g id="zoom-group">
+        <g id="hulls-layer"></g>
+        <g id="edges-layer"></g>
+        <g id="nodes-layer"></g>
+        <g id="labels-layer"></g>
+        <g id="cluster-labels-layer"></g>
+        <g id="ripples-layer"></g>
+      </g>
+    </svg>
+
+    <div id="tooltip">
+      <div class="tt-name" id="tt-name"></div>
+      <div class="tt-cluster" id="tt-cluster"></div>
+      <div class="tt-degree" id="tt-degree"></div>
+    </div>
+
+    <div id="fixed-buttons">
+      <button class="fixed-btn" id="btn-reset">&#8634; visão geral</button>
+      <button class="fixed-btn" id="btn-export">&#8595; exportar PNG</button>
+    </div>
+
+    <div id="hint">scroll · arraste · clique para explorar</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+const CLUSTER_NAMES = {
+  '0': 'Ação Afirmativa e Representação',
+  '1': 'Teoria Social Clássica',
+  '2': 'Sociologia das Relações Raciais',
+  '3': 'Estudos Africanos e Diáspora',
+  '4': 'Antropologia e Mestiçagem',
+  '5': 'Pensamento Negro',
+  '6': 'Desigualdade Racial e Estratificação'
+};
+const PALETTE = ['#7b6fff','#2ec4a7','#ff7b54','#e040fb','#40c4ff','#ffd740','#69f0ae','#ff5252'];
+const WEIGHT_THRESHOLD = 7;
+const TOP_LABELS = 50;
+const GEXF_CANDIDATES = ['rede_raca.gexf','rede_raca_teste.gexf','network.gexf'];
+
+// ═══════════════════════════════════════════════════════
+// STAR FIELD
+// ═══════════════════════════════════════════════════════
+(function () {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function init() {
+    stars = [];
+    for (let i = 0; i < 260; i++) {
+      stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 0.8, a: 0.03 + Math.random() * 0.3 });
+    }
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => {
+      ctx.beginPath();
+      ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,' + s.a + ')';
+      ctx.fill();
+    });
+  }
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; draw(); }
+  init(); resize();
+  window.addEventListener('resize', resize);
+})();
+
+// ═══════════════════════════════════════════════════════
+// GEXF PARSER
+// ═══════════════════════════════════════════════════════
+function parseGEXF(xmlText) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, 'text/xml');
+
+  let modAttrId = null;
+  xml.querySelectorAll('attributes attribute').forEach(a => {
+    const title = (a.getAttribute('title') || '').toLowerCase();
+    if (title.includes('modularity') || title.includes('community') || title.includes('cluster')) {
+      modAttrId = a.getAttribute('id');
+    }
+  });
+
+  const nodes = [];
+  xml.querySelectorAll('graph > nodes > node').forEach(n => {
+    const id = n.getAttribute('id');
+    const label = n.getAttribute('label') || id;
+    const colorEl = n.querySelector('color');
+    let color = null;
+    if (colorEl) {
+      const r = colorEl.getAttribute('r') || 180;
+      const g = colorEl.getAttribute('g') || 180;
+      const b = colorEl.getAttribute('b') || 180;
+      color = 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    const posEl = n.querySelector('position');
+    let px = null, py = null;
+    if (posEl) {
+      px = parseFloat(posEl.getAttribute('x') || 0);
+      py = parseFloat(posEl.getAttribute('y') || 0);
+    }
+    let modClass = null;
+    n.querySelectorAll('attvalue').forEach(av => {
+      const forKey = av.getAttribute('for') || av.getAttribute('id') || '';
+      if (modAttrId !== null && forKey === modAttrId) {
+        modClass = av.getAttribute('value');
+      }
+    });
+    if (modClass === null) {
+      n.querySelectorAll('attvalue').forEach(av => {
+        const k = (av.getAttribute('for') || av.getAttribute('id') || '').toLowerCase();
+        if (k.includes('modularity') || k.includes('community') || k.includes('cluster')) {
+          modClass = av.getAttribute('value');
+        }
+      });
+    }
+    nodes.push({ id, label, color, px, py, modClass: modClass !== null ? String(modClass) : '0' });
+  });
+
+  const edges = [];
+  xml.querySelectorAll('graph > edges > edge').forEach(e => {
+    edges.push({
+      source: e.getAttribute('source'),
+      target: e.getAttribute('target'),
+      weight: parseFloat(e.getAttribute('weight') || 1)
+    });
+  });
+
+  return { nodes, edges };
+}
+
+// ═══════════════════════════════════════════════════════
+// GRAPH PROCESSING
+// ═══════════════════════════════════════════════════════
+function processGraph(rawNodes, rawEdges) {
+  const filteredEdges = rawEdges.filter(e => e.weight >= WEIGHT_THRESHOLD);
+  const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
+  const connectedIds = new Set();
+  filteredEdges.forEach(e => {
+    if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
+      connectedIds.add(e.source); connectedIds.add(e.target);
+    }
+  });
+  const filteredNodes = rawNodes.filter(n => connectedIds.has(n.id));
+
+  const parent = new Map(filteredNodes.map(n => [n.id, n.id]));
+  function find(x) { if (parent.get(x) !== x) parent.set(x, find(parent.get(x))); return parent.get(x); }
+  function union(a, b) { parent.set(find(a), find(b)); }
+  filteredEdges.forEach(e => { if (connectedIds.has(e.source) && connectedIds.has(e.target)) union(e.source, e.target); });
+
+  const compSize = new Map();
+  filteredNodes.forEach(n => { const root = find(n.id); compSize.set(root, (compSize.get(root) || 0) + 1); });
+  let giantRoot = null, giantSize = 0;
+  compSize.forEach((sz, root) => { if (sz > giantSize) { giantSize = sz; giantRoot = root; } });
+
+  const giantNodes = filteredNodes.filter(n => find(n.id) === giantRoot);
+  const giantIds = new Set(giantNodes.map(n => n.id));
+  const giantEdges = filteredEdges.filter(e => giantIds.has(e.source) && giantIds.has(e.target));
+
+  const degMap = new Map(giantNodes.map(n => [n.id, 0]));
+  giantEdges.forEach(e => {
+    degMap.set(e.source, (degMap.get(e.source) || 0) + 1);
+    degMap.set(e.target, (degMap.get(e.target) || 0) + 1);
+  });
+  const maxDeg = Math.max(...degMap.values(), 1);
+
+  giantNodes.forEach(n => {
+    n.degree = degMap.get(n.id) || 0;
+    n.size = 3 + Math.pow(n.degree / maxDeg, 0.55) * 18;
+    n.clusterColor = PALETTE[parseInt(n.modClass || '0') % PALETTE.length];
+    if (!n.color) n.color = n.clusterColor;
+  });
+
+  return { nodes: giantNodes, edges: giantEdges };
+}
+
+// ═══════════════════════════════════════════════════════
+// VIZ STATE
+// ═══════════════════════════════════════════════════════
+let simulation = null;
+let zoomInstance = null;
+let currentNodes = [];
+let currentEdges = [];
+let neighborMap = new Map();
+let highlightNode = null;
+let highlightCluster = null;
+
+function buildNeighborMap(nodes, edges) {
+  const map = new Map(nodes.map(n => [n.id, new Set()]));
+  edges.forEach(e => {
+    if (map.has(e.source)) map.get(e.source).add(e.target);
+    if (map.has(e.target)) map.get(e.target).add(e.source);
+  });
+  return map;
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 120, g: 120, b: 180 };
+}
+
+function edgeColorStr(e, nodeById) {
+  const src = nodeById.get(typeof e.source === 'object' ? e.source.id : e.source);
+  const tgt = nodeById.get(typeof e.target === 'object' ? e.target.id : e.target);
+  if (src && tgt && src.modClass === tgt.modClass) {
+    const c = hexToRgb(src.clusterColor);
+    return 'rgb(' + Math.round(c.r * 0.3 + 20) + ',' + Math.round(c.g * 0.3 + 20) + ',' + Math.round(c.b * 0.3 + 20) + ')';
+  }
+  return '#1e1e30';
+}
+
+function isSameCluster(e, nodeById) {
+  const src = nodeById.get(typeof e.source === 'object' ? e.source.id : e.source);
+  const tgt = nodeById.get(typeof e.target === 'object' ? e.target.id : e.target);
+  return !!(src && tgt && src.modClass === tgt.modClass);
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD VISUALIZATION
+// ═══════════════════════════════════════════════════════
+function buildVisualization(graphData) {
+  const { nodes, edges } = graphData;
+  currentNodes = nodes;
+  currentEdges = edges;
+  neighborMap = buildNeighborMap(nodes, edges);
+
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const svg = d3.select('#viz-svg');
+  const canvasArea = document.getElementById('canvas-area');
+  const W = canvasArea.clientWidth;
+  const H = canvasArea.clientHeight;
+
+  const validX = nodes.map(n => n.px).filter(v => v !== null && !isNaN(v));
+  const validY = nodes.map(n => n.py).filter(v => v !== null && !isNaN(v));
+  const hasPos = validX.length > 0 && validY.length > 0;
+
+  let scaleX, scaleY;
+  if (hasPos) {
+    scaleX = d3.scaleLinear().domain([d3.min(validX), d3.max(validX)]).range([W * 0.1, W * 0.9]);
+    scaleY = d3.scaleLinear().domain([d3.min(validY), d3.max(validY)]).range([H * 0.9, H * 0.1]);
+  }
+
+  nodes.forEach(n => {
+    n.x = (hasPos && n.px !== null && !isNaN(n.px)) ? scaleX(n.px) : W / 2 + (Math.random() - 0.5) * W * 0.8;
+    n.fx_anchor = n.x;
+    n.y = (hasPos && n.py !== null && !isNaN(n.py)) ? scaleY(n.py) : H / 2 + (Math.random() - 0.5) * H * 0.8;
+    n.fy_anchor = n.y;
+  });
+
+  zoomInstance = d3.zoom()
+    .scaleExtent([0.1, 8])
+    .on('zoom', event => {
+      d3.select('#zoom-group').attr('transform', event.transform);
+      updateClusterLabelVisibility(event.transform.k);
+    });
+
+  svg.call(zoomInstance)
+     .on('click', event => { if (!event.target.closest('.node-g')) resetHighlight(); });
+
+  const edgeSel = d3.select('#edges-layer')
+    .selectAll('.edge').data(edges).join('line').attr('class', 'edge')
+    .attr('stroke', e => edgeColorStr(e, nodeById))
+    .attr('stroke-opacity', e => isSameCluster(e, nodeById) ? 0.45 : 0.18)
+    .attr('stroke-width', e => isSameCluster(e, nodeById) ? 0.8 : 0.4);
+
+  const nodeG = d3.select('#nodes-layer')
+    .selectAll('.node-g').data(nodes, d => d.id).join('g')
+    .attr('class', 'node-g').style('cursor', 'pointer');
+
+  nodeG.filter(d => d.size > 8)
+    .append('circle').attr('class', 'glow-bg')
+    .attr('r', d => d.size * 1.8).attr('fill', d => d.clusterColor)
+    .style('opacity', d => 0.08 + (d.size - 8) / 21 * 0.18)
+    .style('filter', 'blur(8px)').style('pointer-events', 'none');
+
+  nodeG.append('circle').attr('class', 'node-circle')
+    .attr('r', d => d.size)
+    .attr('fill', d => d.color || d.clusterColor)
+    .attr('filter', d => d.size > 8 ? 'url(#node-glow)' : null)
+    .attr('stroke', d => d.clusterColor)
+    .attr('stroke-width', 0.5).attr('stroke-opacity', 0.4);
+
+  nodeG
+    .on('mouseenter', (event, d) => { if (highlightNode && highlightNode.id === d.id) return; showTooltip(event, d); if (!highlightNode) applyHover(d); })
+    .on('mousemove', event => positionTooltip(event))
+    .on('mouseleave', () => { hideTooltip(); if (!highlightNode) clearHover(); })
+    .on('click', (event, d) => { event.stopPropagation(); selectNode(d); })
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.1).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0.003); d.fx = null; d.fy = null; })
+    );
+
+  const topNodes = new Set([...nodes].sort((a, b) => b.degree - a.degree).slice(0, TOP_LABELS).map(n => n.id));
+
+  d3.select('#labels-layer').selectAll('.node-label').data(nodes, d => d.id).join('text')
+    .attr('class', 'node-label').text(d => d.label)
+    .attr('text-anchor', 'middle')
+    .attr('font-family', "'Space Grotesk', sans-serif")
+    .attr('font-size', '11px').attr('font-weight', '500')
+    .attr('fill', '#e8e8f0')
+    .attr('paint-order', 'stroke')
+    .attr('stroke', 'rgba(0,0,0,0.8)').attr('stroke-width', '3px')
+    .style('pointer-events', 'none')
+    .style('display', d => topNodes.has(d.id) ? null : 'none');
+
+  renderClusterLabels(nodes);
+  renderHulls(nodes);
+
+  simulation = d3.forceSimulation(nodes)
+    .alphaDecay(0.025)
+    .force('collide', d3.forceCollide(d => d.size + 2).strength(0.7))
+    .force('anchorX', d3.forceX(d => d.fx_anchor).strength(0.35))
+    .force('anchorY', d3.forceY(d => d.fy_anchor).strength(0.35))
+    .on('tick', tick);
+
+  setTimeout(() => { if (simulation) simulation.alphaTarget(0.003).restart(); }, 3000);
+
+  function getNodeObj(ref) {
+    if (ref && typeof ref === 'object') return ref;
+    return nodeById.get(ref) || { x: 0, y: 0 };
+  }
+
+  function tick() {
+    edgeSel
+      .attr('x1', e => getNodeObj(e.source).x).attr('y1', e => getNodeObj(e.source).y)
+      .attr('x2', e => getNodeObj(e.target).x).attr('y2', e => getNodeObj(e.target).y);
+    nodeG.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+    d3.select('#labels-layer').selectAll('.node-label').attr('x', d => d.x).attr('y', d => d.y - d.size - 3);
+    updateHulls(nodes);
+    updateClusterLabelPositions(nodes);
+  }
+
+  buildLegend(nodes);
+  document.getElementById('stats-footer').innerHTML =
+    nodes.length + ' autores · ' + edges.length + ' co-citações<br>' +
+    '<span style="font-size:9px;opacity:.6">Arraste · Zoom · Clique para explorar</span>';
+
+  setTimeout(() => {
+    const hint = document.getElementById('hint');
+    hint.classList.add('visible');
+    setTimeout(() => hint.classList.remove('visible'), 4000);
+  }, 1200);
+}
+
+// ═══════════════════════════════════════════════════════
+// HULLS
+// ═══════════════════════════════════════════════════════
+function getClusterMap(nodes) {
+  const map = new Map();
+  nodes.forEach(n => { if (!map.has(n.modClass)) map.set(n.modClass, []); map.get(n.modClass).push(n); });
+  return map;
+}
+
+function expandHull(pts, cx, cy, amount) {
+  return pts.map(([x, y]) => {
+    const dx = x - cx, dy = y - cy;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    return [x + (dx / d) * amount, y + (dy / d) * amount];
+  });
+}
+
+const lineGen = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+
+function renderHulls(nodes) {
+  const clusterMap = getClusterMap(nodes);
+  const hullData = [];
+  clusterMap.forEach((clNodes, mc) => hullData.push({ mc, clNodes }));
+  d3.select('#hulls-layer').selectAll('.hull-path').data(hullData, d => d.mc).join('path')
+    .attr('class', 'hull-path')
+    .attr('fill', d => PALETTE[parseInt(d.mc) % PALETTE.length]).attr('fill-opacity', 0.08)
+    .attr('stroke', d => PALETTE[parseInt(d.mc) % PALETTE.length]).attr('stroke-opacity', 0.28)
+    .attr('stroke-width', 1.5).style('pointer-events', 'none');
+  updateHulls(nodes);
+}
+
+function updateHulls(nodes) {
+  const clusterMap = getClusterMap(nodes);
+  d3.select('#hulls-layer').selectAll('.hull-path').each(function (d) {
+    const clNodes = clusterMap.get(d.mc) || [];
+    const pts = clNodes.map(n => [n.x, n.y]);
+    let pathD = '';
+    if (pts.length === 0) {
+      pathD = '';
+    } else if (pts.length === 1) {
+      const [px, py] = pts[0], r = 30;
+      pathD = 'M' + px + ',' + (py - r) + ' A' + r + ',' + r + ',0,1,1,' + (px - 0.01) + ',' + (py - r) + ' Z';
+    } else if (pts.length === 2) {
+      const [ax, ay] = pts[0], [bx, by] = pts[1];
+      const len = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2) || 1;
+      const nx = -(by - ay) / len * 28, ny = (bx - ax) / len * 28;
+      pathD = lineGen([[ax + nx, ay + ny], [bx + nx, by + ny], [bx - nx, by - ny], [ax - nx, ay - ny]]);
+    } else {
+      const hull = d3.polygonHull(pts);
+      if (hull) {
+        const cx = d3.mean(hull, p => p[0]), cy = d3.mean(hull, p => p[1]);
+        pathD = lineGen(expandHull(hull, cx, cy, 28));
+      }
+    }
+    d3.select(this).attr('d', pathD);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// CLUSTER LABELS
+// ═══════════════════════════════════════════════════════
+function clusterCentroid(clNodes) {
+  return { x: d3.mean(clNodes, n => n.x), y: d3.mean(clNodes, n => n.y) };
+}
+
+function renderClusterLabels(nodes) {
+  const clusterMap = getClusterMap(nodes);
+  const allCx = [], allCy = [];
+  clusterMap.forEach(cn => { const c = clusterCentroid(cn); allCx.push(c.x); allCy.push(c.y); });
+  const gcx = d3.mean(allCx), gcy = d3.mean(allCy);
+
+  const badgeData = [];
+  clusterMap.forEach((clNodes, mc) => {
+    const c = clusterCentroid(clNodes);
+    const dx = c.x - gcx, dy = c.y - gcy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const pf = dist < 150 ? 2.5 : 1.8;
+    badgeData.push({
+      mc, clNodes,
+      bx: c.x + (dx / dist) * dist * (pf - 1),
+      by: c.y + (dy / dist) * dist * (pf - 1),
+      color: PALETTE[parseInt(mc) % PALETTE.length],
+      name: (CLUSTER_NAMES[mc] || 'Cluster ' + mc).toUpperCase()
+    });
+  });
+
+  const layer = d3.select('#cluster-labels-layer');
+  const groups = layer.selectAll('.cluster-badge').data(badgeData, d => d.mc).join('g')
+    .attr('class', 'cluster-badge').style('pointer-events', 'none');
+
+  groups.append('rect').attr('class', 'badge-rect')
+    .attr('fill', d => d.color).attr('fill-opacity', 0.13)
+    .attr('stroke', d => d.color).attr('stroke-opacity', 0.3)
+    .attr('stroke-width', 1).attr('rx', 9).attr('ry', 9);
+
+  groups.append('text').attr('class', 'badge-text')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+    .attr('font-family', "'Space Grotesk', sans-serif")
+    .attr('font-size', '9px').attr('font-weight', '600')
+    .attr('letter-spacing', '0.1em')
+    .attr('fill', d => d.color)
+    .text(d => d.name);
+
+  setTimeout(() => {
+    layer.selectAll('.cluster-badge').each(function () {
+      const g = d3.select(this);
+      const textEl = g.select('.badge-text').node();
+      if (!textEl) return;
+      try {
+        const bb = textEl.getBBox();
+        g.select('.badge-rect').attr('x', -bb.width / 2 - 10).attr('y', -bb.height / 2 - 5)
+          .attr('width', bb.width + 20).attr('height', bb.height + 10);
+      } catch (e) {}
+    });
+  }, 200);
+
+  updateClusterLabelPositions(nodes);
+}
+
+function updateClusterLabelPositions(nodes) {
+  const clusterMap = getClusterMap(nodes);
+  const allCx = [], allCy = [];
+  clusterMap.forEach(cn => { const c = clusterCentroid(cn); allCx.push(c.x); allCy.push(c.y); });
+  const gcx = d3.mean(allCx), gcy = d3.mean(allCy);
+  d3.select('#cluster-labels-layer').selectAll('.cluster-badge').each(function (d) {
+    const clNodes = clusterMap.get(d.mc);
+    if (!clNodes || !clNodes.length) return;
+    const c = clusterCentroid(clNodes);
+    const dx = c.x - gcx, dy = c.y - gcy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const pf = dist < 150 ? 2.5 : 1.8;
+    const lx = c.x + (dx / dist) * dist * (pf - 1);
+    const ly = c.y + (dy / dist) * dist * (pf - 1);
+    d3.select(this).attr('transform', 'translate(' + lx + ',' + ly + ')');
+  });
+}
+
+function updateClusterLabelVisibility(k) {
+  d3.select('#cluster-labels-layer')
+    .style('opacity', (k < 0.15 || k > 2) ? 0 : 1)
+    .style('transition', 'opacity 0.3s');
+}
+
+// ═══════════════════════════════════════════════════════
+// LEGEND
+// ═══════════════════════════════════════════════════════
+function buildLegend(nodes) {
+  const clusterMap = getClusterMap(nodes);
+  const legendEl = document.getElementById('cluster-legend');
+  legendEl.innerHTML = '';
+  const entries = [];
+  clusterMap.forEach((clNodes, mc) => {
+    entries.push({ mc, count: clNodes.length, color: PALETTE[parseInt(mc) % PALETTE.length], name: CLUSTER_NAMES[mc] || 'Cluster ' + mc });
+  });
+  entries.sort((a, b) => b.count - a.count);
+  entries.forEach(e => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.dataset.mc = e.mc;
+    item.innerHTML =
+      '<div class="legend-dot" style="background:' + e.color + ';box-shadow:0 0 5px ' + e.color + '55"></div>' +
+      '<div class="legend-name">' + e.name + '</div>' +
+      '<div class="legend-count">' + String(e.count).padStart(3, '0') + '</div>';
+    item.addEventListener('click', () => selectCluster(e.mc));
+    legendEl.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// HIGHLIGHT / SELECT
+// ═══════════════════════════════════════════════════════
+function getTopNodes() {
+  return new Set([...currentNodes].sort((a, b) => b.degree - a.degree).slice(0, TOP_LABELS).map(n => n.id));
+}
+
+function applyHover(d) {
+  const neighbors = neighborMap.get(d.id) || new Set();
+  d3.select('#nodes-layer').selectAll('.node-g').style('opacity', n => n.id === d.id || neighbors.has(n.id) ? 1 : 0.08);
+  d3.select('#edges-layer').selectAll('.edge').style('opacity', e => {
+    const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+    const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
+    return (srcId === d.id || tgtId === d.id) ? 1 : 0.03;
+  });
+  d3.select('#labels-layer').selectAll('.node-label')
+    .style('display', n => (n.id === d.id || neighbors.has(n.id)) ? null : 'none');
+}
+
+function clearHover() {
+  d3.select('#nodes-layer').selectAll('.node-g').style('opacity', null);
+  d3.select('#edges-layer').selectAll('.edge').style('opacity', null);
+  const top = getTopNodes();
+  d3.select('#labels-layer').selectAll('.node-label').style('display', d => top.has(d.id) ? null : 'none');
+}
+
+function selectNode(d) {
+  highlightNode = d;
+  highlightCluster = null;
+  applyHover(d);
+  showRipple(d);
+  showNodeCard(d);
+  document.getElementById('btn-reset').style.display = 'block';
+  document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+  const W = document.getElementById('canvas-area').clientWidth;
+  const H = document.getElementById('canvas-area').clientHeight;
+  const k = 2.5;
+  d3.select('#viz-svg').transition().duration(700)
+    .call(zoomInstance.transform, d3.zoomIdentity.translate(W / 2 - k * d.x, H / 2 - k * d.y).scale(k));
+}
+
+function selectCluster(mc) {
+  highlightCluster = mc;
+  highlightNode = null;
+  hideNodeCard();
+  const clIds = new Set(currentNodes.filter(n => n.modClass === mc).map(n => n.id));
+  const clNodes = currentNodes.filter(n => n.modClass === mc);
+  d3.select('#nodes-layer').selectAll('.node-g').style('opacity', n => clIds.has(n.id) ? 1 : 0.06);
+  d3.select('#edges-layer').selectAll('.edge').style('opacity', e => {
+    const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+    const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
+    return (clIds.has(srcId) && clIds.has(tgtId)) ? 0.6 : 0.03;
+  });
+  d3.select('#hulls-layer').selectAll('.hull-path')
+    .attr('fill-opacity', d => d.mc === mc ? 0.18 : 0.03)
+    .attr('stroke-opacity', d => d.mc === mc ? 0.6 : 0.08);
+  const top = getTopNodes();
+  d3.select('#labels-layer').selectAll('.node-label')
+    .style('display', d => clIds.has(d.id) && top.has(d.id) ? null : 'none');
+  document.querySelectorAll('.legend-item').forEach(el => el.classList.toggle('active', el.dataset.mc === mc));
+  document.getElementById('btn-reset').style.display = 'block';
+  const cx = d3.mean(clNodes, n => n.x), cy = d3.mean(clNodes, n => n.y);
+  const W = document.getElementById('canvas-area').clientWidth;
+  const H = document.getElementById('canvas-area').clientHeight;
+  d3.select('#viz-svg').transition().duration(700)
+    .call(zoomInstance.transform, d3.zoomIdentity.translate(W / 2 - 1.4 * cx, H / 2 - 1.4 * cy).scale(1.4));
+}
+
+function resetHighlight() {
+  highlightNode = null;
+  highlightCluster = null;
+  clearHover();
+  hideNodeCard();
+  hideTooltip();
+  d3.select('#hulls-layer').selectAll('.hull-path').attr('fill-opacity', 0.08).attr('stroke-opacity', 0.28);
+  document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('btn-reset').style.display = 'none';
+  d3.select('#viz-svg').transition().duration(700).call(zoomInstance.transform, d3.zoomIdentity);
+}
+
+// ═══════════════════════════════════════════════════════
+// RIPPLE
+// ═══════════════════════════════════════════════════════
+function showRipple(d) {
+  const ripple = d3.select('#ripples-layer').append('circle')
+    .attr('cx', d.x).attr('cy', d.y).attr('r', d.size)
+    .attr('fill', 'none').attr('stroke', d.clusterColor).attr('stroke-width', 2).attr('opacity', 0.8);
+  ripple.transition().duration(800).ease(d3.easeCubicOut).attr('r', 40).attr('opacity', 0).remove();
+}
+
+// ═══════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════
+function showTooltip(event, d) {
+  document.getElementById('tt-name').textContent = d.label;
+  document.getElementById('tt-cluster').textContent = CLUSTER_NAMES[d.modClass] || d.modClass;
+  document.getElementById('tt-degree').textContent = d.degree + ' co-citações';
+  document.getElementById('tooltip').classList.add('visible');
+  positionTooltip(event);
+}
+function positionTooltip(event) {
+  const tt = document.getElementById('tooltip');
+  const x = event.clientX + 14, y = event.clientY - 10;
+  tt.style.left = Math.min(x, window.innerWidth - tt.offsetWidth - 8) + 'px';
+  tt.style.top = Math.min(y, window.innerHeight - tt.offsetHeight - 8) + 'px';
+}
+function hideTooltip() { document.getElementById('tooltip').classList.remove('visible'); }
+
+// ═══════════════════════════════════════════════════════
+// NODE CARD
+// ═══════════════════════════════════════════════════════
+function showNodeCard(d) {
+  document.getElementById('node-card').style.display = 'block';
+  const color = d.clusterColor;
+  const tag = document.getElementById('card-tag');
+  tag.textContent = CLUSTER_NAMES[d.modClass] || d.modClass;
+  tag.style.background = color + '22';
+  tag.style.color = color;
+  tag.style.border = '1px solid ' + color + '44';
+  document.getElementById('card-name').textContent = d.label;
+  document.getElementById('card-degree').textContent = d.degree;
+  document.getElementById('card-pct').textContent = ((d.degree / Math.max(currentEdges.length, 1)) * 100).toFixed(1) + '%';
+  const nbIds = [...(neighborMap.get(d.id) || [])];
+  const topNbs = nbIds.map(id => currentNodes.find(n => n.id === id)).filter(Boolean)
+    .sort((a, b) => b.degree - a.degree).slice(0, 6);
+  const container = document.getElementById('card-neighbors');
+  container.innerHTML = '';
+  topNbs.forEach(nb => {
+    const chip = document.createElement('span');
+    chip.className = 'neighbor-chip';
+    chip.textContent = nb.label;
+    chip.addEventListener('click', () => selectNode(nb));
+    container.appendChild(chip);
+  });
+}
+function hideNodeCard() { document.getElementById('node-card').style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════
+function initSearch() {
+  const input = document.getElementById('search-input');
+  const dropdown = document.getElementById('search-dropdown');
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    dropdown.innerHTML = '';
+    if (!q) { dropdown.classList.remove('open'); return; }
+    const matches = currentNodes.filter(n => n.label.toLowerCase().includes(q))
+      .sort((a, b) => b.degree - a.degree).slice(0, 8);
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="search-empty">Não encontrado</div>';
+    } else {
+      matches.forEach(n => {
+        const item = document.createElement('div');
+        item.className = 'search-item';
+        item.textContent = n.label;
+        item.addEventListener('mousedown', ev => { ev.preventDefault(); input.value = ''; dropdown.classList.remove('open'); selectNode(n); });
+        dropdown.appendChild(item);
+      });
+    }
+    dropdown.classList.add('open');
+  });
+  input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 150));
+  input.addEventListener('focus', () => { if (input.value.trim()) dropdown.classList.add('open'); });
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORT PNG
+// ═══════════════════════════════════════════════════════
+document.getElementById('btn-export').addEventListener('click', () => {
+  const svgEl = document.getElementById('viz-svg');
+  let source = new XMLSerializer().serializeToString(svgEl);
+  if (!source.includes('xmlns="http://www.w3.org/2000/svg"')) {
+    source = source.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = svgEl.clientWidth * 2;
+    canvas.height = svgEl.clientHeight * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#03030a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(2, 2);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = 'rede-co-citacao-raciais.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  img.src = url;
+});
+
+document.getElementById('btn-reset').addEventListener('click', resetHighlight);
+document.getElementById('panel-toggle').addEventListener('click', () => {
+  document.getElementById('panel').classList.toggle('collapsed');
+});
+
+// ═══════════════════════════════════════════════════════
+// LOAD / PROCESS
+// ═══════════════════════════════════════════════════════
+function showApp() {
+  document.getElementById('app').style.display = 'flex';
+  initSearch();
+}
+
+function processAndRender(xmlText) {
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('loading-overlay').style.display = 'flex';
+  setTimeout(() => {
+    try {
+      const { nodes: rawNodes, edges: rawEdges } = parseGEXF(xmlText);
+      const graphData = processGraph(rawNodes, rawEdges);
+      document.getElementById('loading-overlay').style.display = 'none';
+      showApp();
+      setTimeout(() => buildVisualization(graphData), 60);
+    } catch (err) {
+      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById('load-screen').style.display = 'flex';
+      showUploadFallback();
+      alert('Erro ao processar o GEXF: ' + err.message);
+      console.error(err);
+    }
+  }, 120);
+}
+
+function showUploadFallback() {
+  document.getElementById('splash-loading').style.display = 'none';
+  document.getElementById('splash-upload').style.display = 'flex';
+}
+
+// File drag & drop
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+document.getElementById('browse-link').addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => processAndRender(e.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ── Auto-fetch: tenta os candidatos em sequência ──
+(async function autoFetch() {
+  if (location.protocol === 'file:') {
+    // rodando local sem servidor — mostra upload imediatamente
+    showUploadFallback();
+    return;
+  }
+  const bar = document.getElementById('splash-bar');
+  const txt = document.getElementById('splash-loading-text');
+  bar.style.width = '20%';
+  for (const fname of GEXF_CANDIDATES) {
+    try {
+      txt.textContent = 'Buscando ' + fname + '…';
+      bar.style.width = '55%';
+      const resp = await fetch('./' + fname);
+      if (!resp.ok) continue;
+      bar.style.width = '85%';
+      txt.textContent = 'Processando…';
+      const text = await resp.text();
+      bar.style.width = '100%';
+      setTimeout(() => processAndRender(text), 200);
+      return;
+    } catch (_) { continue; }
+  }
+  // nenhum arquivo encontrado — mostra upload
+  showUploadFallback();
+})();
+</script>
+</body>
+</html>
